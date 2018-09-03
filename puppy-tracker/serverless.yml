@@ -1,0 +1,65 @@
+service: puppy-tracker
+tenant: jewelsjacobs
+app: puppy-tracker
+
+custom:
+  tableName: 'puppies-table-${self:provider.stage}'
+  dynamodb:
+    start:
+      migrate: true
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: dev
+  region: us-east-1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - { "Fn::GetAtt": ["PuppiesDynamoDBTable", "Arn" ] }
+  environment:
+    PUPPIES_TABLE: ${self:custom.tableName}
+
+functions:
+  app:
+    handler: index.handler
+    events:
+      - http: ANY /
+      - http: 'ANY {proxy+}'
+  getPuppy:
+    handler: index.handler
+    events:
+      - http: 'GET /puppy/{proxy+}'
+  createPuppy:
+    handler: index.handler
+    events:
+      - http: 'POST /puppies'
+
+resources:
+  Resources:
+    PuppiesDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: puppyId
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: puppyId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tableName}
+
+plugins:
+  - serverless-dynamodb-local
+  - serverless-offline
